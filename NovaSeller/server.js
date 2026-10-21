@@ -6,7 +6,7 @@ app.use(cors());
 app.use(express.json());
 
 // Сюда вставляем URL вебхука, который вам дал админ чужого сервера
-const DISCORD_WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://discord.com/api/webhooks/1561735828030361603/IDhItp-EqV8nu53MkPU6WlZT35JKbtbVs8RM-flj8daZSrOAHOI6L1groWn_KRT1Xg81';
+const DISCORD_WEBHOOK_URL = process.env.WEBHOOK_URL;
 
 // Превращаем URL вебхука в URL для чтения сообщений (дописываем /messages в конец)
 const DISCORD_API_URL = `${DISCORD_WEBHOOK_URL}/messages`;
