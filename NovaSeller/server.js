@@ -5,40 +5,40 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Сюда вставляем URL вебхука, который вам дал админ чужого сервера
-const DISCORD_WEBHOOK_URL = process.env.WEBHOOK_URL;
+// Точный URL вебхука, который создали админы
+const DISCORD_API_URL = 'https://discord.com';
 
-// Превращаем URL вебхука в URL для чтения сообщений (дописываем /messages в конец)
-const DISCORD_API_URL = `${DISCORD_WEBHOOK_URL}/messages`;
-
-// Сюда наш сайт (index.html) будет обращаться за сообщениями
-app.get('/api/messages', async (req, res) => {
+app.get('/api/latest-message', async (req, res) => {
     try {
-        // Наш сервер сам делает запрос к Discord по ссылке вебхука
+        // Запрашиваем сообщения из канала объявлений через вебхук
         const discordResponse = await fetch(DISCORD_API_URL, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
 
         if (!discordResponse.ok) {
-            return res.status(discordResponse.status).json({ error: 'Discord API вернул ошибку' });
+            return res.status(discordResponse.status).json({ error: 'Discord запретил доступ. Проверьте, сделан ли канал объявлением.' });
         }
 
         const discordMessages = await discordResponse.json();
 
-        // Форматируем сообщения для нашего сайта
-        const formattedMessages = discordMessages.map(msg => ({
-            author: msg.author ? msg.author.username : 'Система',
-            text: msg.content,
-            time: new Date(msg.timestamp).toLocaleTimeString('ru-RU')
-        }));
+        if (discordMessages.length === 0) {
+            return res.json({ text: 'В канале пока нет сообщений', author: '', time: '' });
+        }
 
-        res.json(formattedMessages.reverse()); // Отдаем сообщения на сайт (новые внизу)
+        // Берем самое первое сообщение из массива (Discord возвращает их от новых к старым)
+        const latest = discordMessages[0];
+
+        res.json({
+            author: latest.author ? latest.author.username : 'Система',
+            text: latest.content,
+            time: new Date(latest.timestamp).toLocaleTimeString('ru-RU')
+        });
     } catch (err) {
-        console.error('Ошибка запроса к Discord:', err);
-        res.status(500).json({ error: 'Ошибка сервера при чтении Discord' });
+        console.error(err);
+        res.status(500).json({ error: 'Ошибка сервера на Render' });
     }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Сервер работает на порту ${PORT}`));
+app.listen(PORT, () => console.log(`Сервер запущен`));
