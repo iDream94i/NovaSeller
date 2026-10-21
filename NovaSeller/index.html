@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Discord Монитор</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2f3136; color: #fff; padding: 20px; max-width: 600px; margin: 0 auto; }
+        h1 { border-bottom: 2px solid #4f545c; padding-bottom: 10px; }
+        .message { background: #36393f; padding: 12px; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #5865F2; }
+        .author { font-weight: bold; color: #5865F2; }
+        .time { color: #72767d; font-size: 12px; margin-left: 10px; }
+        p { margin: 5px 0 0 0; word-break: break-word; }
+    </style>
+</head>
+<body>
+    <h1>Лента канала Discord</h1>
+    <div id="chat">Загрузка сообщений...</div>
+
+    <script>
+        // СЮДА НУЖНО БУДЕТ ВСТАВИТЬ ССЫЛКУ ИЗ RAILWAY (например: https://railway.app)
+        const BACKEND_URL = 'ССЫЛКА_ИЗ_RAILWAY'; 
+
+        async function loadMessages() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/messages`);
+                const messages = await response.json();
+                const chatDiv = document.getElementById('chat');
+                
+                chatDiv.innerHTML = messages.map(msg => `
+                    <div class="message">
+                        <span class="author">${msg.author}</span>
+                        <span class="time">${msg.time}</span>
+                        <p>${msg.text}</p>
+                    </div>
+                `).join('') || 'Сообщений пока нет. Напишите что-нибудь в Discord!';
+            } catch (err) {
+                document.getElementById('chat').innerText = 'Ошибка подключения к серверу';
+            }
+        }
+
+        setInterval(loadMessages, 5000);
+        loadMessages();
+    </script>
+</body>
+</html>
