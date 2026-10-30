@@ -20,21 +20,85 @@
         
         /* Золотой цвет текста для САМОЙ высокой цены в строке */
         .highest-text { color: #bf9021 !important; font-weight: bold; }
+		/* 1. Делаем общий фон страницы черным, а текст — белым/светлым */
+body {
+    background-color: #121212; /* Глубокий темный цвет вместо чистого черного (так приятнее глазам) */
+    color: #e0e0e0;
+}
+
+/* Если у ячейки есть зеленый фон (.best-price), но она НЕ золотая — делаем текст темно-зеленым или черным для идеального контраста */
+td.best-price {
+    background-color: #c7f5d9 !important; /* Ваш текущий светло-зеленый фон */
+    color: #1b4d3e !important;            /* Темно-зеленый глубокий цвет текста */
+    font-weight: 600;                     /* Делаем текст чуть плотнее */
+}
+
+/* Если ячейка ОДНОВРЕМЕННО и зеленая, и самая выгодная (золотой текст) — сохраняем золотой/оранжевый цвет текста */
+td.best-price.highest-text {
+    color: #ff9f43 !important;            /* Яркий золотой/оранжевый цвет, который хорошо видно на зеленом */
+    text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.8); /* Легкая темная тень под текстом, чтобы золото не сливалось с зеленью */
+}
+
+
+/* 2. Стилизуем саму таблицу */
+table {
+    background-color: #1a1a1a; /* Чуть более светлый оттенок для самой таблицы, чтобы она выделялась */
+    border-collapse: collapse;
+    color: #e0e0e0;
+}
+
+/* 3. Фон для всех обычных (не закрашенных) ячеек делаем темным/черным */
+table td, table th {
+    background-color: #1a1a1a; /* Или #121212, если хотите абсолютно монолитный черный фон */
+    border: 1px solid #333333; /* Тонкая серая рамка, чтобы ячейки не сливались в темноте */
+    color: #ffffff;
+}
+
+/* 4. Сохраняем подсветку только для цветных ячеек (зеленых/оранжевых) */
+/* Если вы используете классы вроде .highlight, .green-bg или инлайн-стили: */
+table td.green-bg {
+    background-color: #1b4d22 !important; /* Приглушенный темно-зеленый, чтобы текст легко читался */
+    color: #4af626; /* Яркий текст для контраста */
+}
+
+table td.orange-bg {
+    background-color: #4d331b !important; /* Приглушенный темно-оранжевый */
+    color: #ff9f43;
+}
+/* 1. Делаем текст всех названий товаров (первая колонка td) ярко-белым */
+table td:first-child {
+    color: #ffffff !important;
+    font-weight: 600; /* Делаем текст чуть жирнее для лучшей видимости */
+}
+
+/* 2. Для надежности: если первая колонка у вас обернута в <th>, добавим и для нее */
+table th:first-child {
+    color: #ffffff !important;
+}
+
+/* 3. Делаем заголовки колонок (Товар, Сэндик, Доки, Порт) светло-серыми/белыми */
+table th {
+    color: #ffffff !important;
+}
+
     </style>
 </head>
 <body>
 
-    <div class="meta-info">
+
+   <div class="meta-info">
         Автор изменения цен: <strong id="author" style="color: #fff;">-</strong> | Обновлено: <strong id="time" style="color: #fff;">-</strong>
     </div>
+
+
 
     <table id="prices-table">
         <thead>
             <tr>
                 <th style="text-align: left;">Товар</th>
-                <th>Скупщик №1</th>
-                <th>Скупщик №2</th>
-                <th>Скупщик №3</th>
+                <th>Сэндик</th>
+                <th>Доки</th>
+                <th>Порт</th>
             </tr>
         </thead>
         <tbody id="table-body">
@@ -44,7 +108,7 @@
         </tbody>
     </table>
 
-    <script>
+<script>
         const BACKEND_URL = 'https://novaseller.onrender.com'; 
 
         // База ваших пороговых цен
@@ -110,7 +174,7 @@
             return -1;
         }
 
-        // ИСПРАВЛЕНО: Извлекаем ПЕРВУЮ цену до скобок (для поиска золотого цвета текста)
+        // Извлекаем ПЕРВУЮ цену до скобок (для поиска золотого цвета текста)
         function getFirstPrice(priceStr) {
             if (!priceStr || typeof priceStr !== 'string') return -1;
             // Разделяем строку по скобке и берем строго её ПЕРВУЮ часть под индексом [0]
@@ -127,7 +191,24 @@
                 if (msg.error || !msg.text) return;
 
                 document.getElementById('author').innerText = msg.author || 'Неизвестно';
-                document.getElementById('time').innerText = msg.time || '--:--:--';
+                
+                // ВЫТАСКИВАЕМ ДАТУ И ВРЕМЯ ИЗ ПЕРВОЙ СТРОКИ СООБЩЕНИЯ БОТА
+                const rawText = msg.text; // Например: ":bell: Изменение цен у скупщиков (29.10.2026 10:05 МСК)"
+                const timeRegex = /(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/;
+                const match = rawText ? rawText.match(timeRegex) : null;
+
+                if (match && match[1] && match[2] && match[4] && match[5]) {
+                    const day = match[1];
+                    const month = match[2];
+                    const hours = match[4];
+                    const minutes = match[5];
+
+                    // Заменяем вывод системного времени на дату из текста
+                    document.getElementById('time').innerText = `${day}.${month} в ${hours}:${minutes}`;
+                } else {
+                    // Если регулярное выражение не нашло дату внутри текста, оставляем старое системное время
+                    document.getElementById('time').innerText = msg.time || '--:--:--';
+                }
                 
                 const items = parsePrices(msg.text);
                 const tbody = document.getElementById('table-body');
@@ -138,7 +219,7 @@
                     const price2 = item.prices[2] || '';
                     const price3 = item.prices[3] || '';
 
-                    // 1. ЛОГИКА ЗОЛОТОГО ЦВЕТА (Ищем самую большую базовую цену в строке)
+                    // 1. ЛОГИКА ЗОЛОТОГО ЦВЕТА
                     const f1 = getFirstPrice(price1);
                     const f2 = getFirstPrice(price2);
                     const f3 = getFirstPrice(price3);
@@ -148,7 +229,7 @@
                     const isHighestText2 = (f2 === maxFirstPrice && f2 !== -1) ? 'highest-text' : '';
                     const isHighestText3 = (f3 === maxFirstPrice && f3 !== -1) ? 'highest-text' : '';
 
-                    // 2. ЛОГИКА ЗЕЛЕНОГО ФОНА (Проверяем превышение лимитов в скобках)
+                    // 2. ЛОГИКА ЗЕЛЕНОГО ФОНА
                     const b1 = getBracketPrice(price1);
                     const b2 = getBracketPrice(price2);
                     const b3 = getBracketPrice(price3);
