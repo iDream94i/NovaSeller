@@ -65,7 +65,7 @@ function extractText(message) {
 
 async function checkAndNotifyTelegram(text) {
     if (!TG_BOT_TOKEN || !TG_CHAT_ID) {
-        console.log('ВНИМАНИЕ: Не заданы TG_BOT_TOKEN или TG_CHAT_ID в настройках Render!');
+        console.log('ОШИБКА: Не заданы TG_BOT_TOKEN или TG_CHAT_ID в настройках Render!');
         return;
     }
     if (!text) return;
@@ -139,7 +139,6 @@ async function checkAndNotifyTelegram(text) {
 client.once('ready', async () => {
     console.log(`Робот ${client.user.tag} успешно запущен в сеть!`);
     
-    // Сразу при запуске забираем последнее сообщение и отправляем тестовый отчет в ТГ
     try {
         const channel = await client.channels.fetch(CHANNEL_ID);
         if (channel) {
@@ -200,6 +199,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`Сервер запущен на порту ${PORT}`);
 });
 
+console.log('Начинаю авторизацию в Discord...');
 client.login(BOT_TOKEN)
     .then(() => console.log('Успешный вход в Discord API'))
     .catch(err => console.error('Ошибка авторизации Discord бота:', err));
