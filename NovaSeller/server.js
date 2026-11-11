@@ -17,9 +17,8 @@ const client = new Client({
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID = process.env.TG_CHAT_ID;
-const CHANNEL_ID = '1561736046423711826'; // ID канала цены-скупщика
+const CHANNEL_ID = '1561736046423711826';
 
-// Ваши пороговые цены (как на сайте)
 const PRICE_THRESHOLDS = {
     "Медь": 60,
     "Изумруд": 384,
@@ -64,15 +63,17 @@ function extractText(message) {
     return 'Пустое сообщение или неподдерживаемый формат';
 }
 
-// Функция анализа текста и отправки лучших цен в Telegram
 async function checkAndNotifyTelegram(text) {
-    if (!TG_BOT_TOKEN || !TG_CHAT_ID || !text) return;
+    if (!TG_BOT_TOKEN || !TG_CHAT_ID) {
+        console.log('ВНИМАНИЕ: Не заданы TG_BOT_TOKEN или TG_CHAT_ID в настройках Render!');
+        return;
+    }
+    if (!text) return;
 
     const lines = text.split('\n');
     let currentBuyer = 0;
     const goodDeals = [];
 
-    // Ищем время из первой строчки
     const timeMatch = text.match(/(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/);
     const updateTime = timeMatch ? timeMatch[1] : new Date().toLocaleTimeString('ru-RU');
 
@@ -91,14 +92,12 @@ async function checkAndNotifyTelegram(text) {
                 const itemName = trimmed.substring(0, colonIndex).trim();
                 const priceValue = trimmed.substring(colonIndex + 1).replace(/`/g, '').trim();
 
-                // Достаем цену в скобках для сравнения с порогом
                 const bracketMatch = priceValue.match(/\(([^)]+)\)/);
                 if (bracketMatch && bracketMatch[1]) {
                     const digitsMatch = bracketMatch[1].match(/\d+/);
                     const bracketPrice = digitsMatch ? parseInt(digitsMatch[0], 10) : -1;
                     const threshold = PRICE_THRESHOLDS[itemName];
 
-                    // Если цена превышает порог — добавляем в список для отправки
                     if (threshold && bracketPrice > threshold) {
                         goodDeals.push(`• <b>${itemName}</b> (${BUYER_NAMES[currentBuyer]}): ${priceValue}`);
                     }
@@ -107,7 +106,6 @@ async function checkAndNotifyTelegram(text) {
         }
     });
 
-    // Формируем текст сообщения
     let tgMessage = `🔔 <b>Обновление цен (${updateTime})</b>\n\n`;
     
     if (goodDeals.length > 0) {
@@ -116,9 +114,9 @@ async function checkAndNotifyTelegram(text) {
         tgMessage += `📉 В этом часе цен выше установленного порога нет.`;
     }
 
-    // Отправляем запрос в Telegram
     try {
-        await fetch(`https://telegram.org{TG_BOT_TOKEN}/sendMessage`, {
+        const url = `https://telegram.org{TG_BOT_TOKEN}/sendMessage`;
+        const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -127,17 +125,41 @@ async function checkAndNotifyTelegram(text) {
                 parse_mode: 'HTML'
             })
         });
-        console.log('Уведомление успешно отправлено в Telegram.');
+        const result = await response.json();
+        if (result.ok) {
+            console.log('Уведомление успешно отправлено в Telegram!');
+        } else {
+            console.error('Ошибка от самого Telegram API:', result.description);
+        }
     } catch (err) {
-        console.error('Ошибка отправки в Telegram:', err);
+        console.error('Сетевая ошибка отправки в Telegram:', err);
     }
 }
 
-client.once('ready', () => {
+client.once('ready', async () => {
     console.log(`Робот ${client.user.tag} успешно запущен в сеть!`);
+    
+    // Сразу при запуске забираем последнее сообщение и отправляем тестовый отчет в ТГ
+    try {
+        const channel = await client.channels.fetch(CHANNEL_ID);
+        if (channel) {
+            const messages = await channel.messages.fetch({ limit: 1 });
+            const last = messages.first();
+            if (last) {
+                const extracted = extractText(last);
+                latestMessage = {
+                    author: last.author.username,
+                    text: extracted,
+                    time: new Date(last.createdTimestamp).toLocaleTimeString('ru-RU')
+                };
+                await checkAndNotifyTelegram(extracted);
+            }
+        }
+    } catch (err) {
+        console.error('Ошибка при стартовой проверке канала:', err);
+    }
 });
 
-// Слушаем новые сообщения в реальном времени
 client.on('messageCreate', (message) => {
     if (message.channel.id === CHANNEL_ID) {
         const extracted = extractText(message);
@@ -146,8 +168,6 @@ client.on('messageCreate', (message) => {
             text: extracted,
             time: new Date(message.createdTimestamp).toLocaleTimeString('ru-RU')
         };
-        
-        // Запускаем проверку и отправку в ТГ при получении нового сообщения
         checkAndNotifyTelegram(extracted);
     }
 });
@@ -171,19 +191,15 @@ app.get('/api/latest-message', async (req, res) => {
         res.json(latestMessage);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Бот не может прочитать этот канал. Проверьте права доступа бота в Discord.' });
+        res.status(500).json({ error: 'Бот не может прочитать этот канал.' });
     }
 });
 
 const PORT = process.env.PORT || 10000;
-
-// 1. Сразу открываем порт для Render, чтобы деплой не падал по таймауту
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Сервер запущен на порту ${PORT}`);
 });
 
-// 2. Авторизуем Discord-бота параллельно
 client.login(BOT_TOKEN)
     .then(() => console.log('Успешный вход в Discord API'))
     .catch(err => console.error('Ошибка авторизации Discord бота:', err));
-
