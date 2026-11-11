@@ -175,7 +175,15 @@ app.get('/api/latest-message', async (req, res) => {
     }
 });
 
-client.login(BOT_TOKEN).then(() => {
-    const PORT = process.env.PORT || 10000;
-    app.listen(PORT, () => console.log(`Сервер запущен`));
+const PORT = process.env.PORT || 10000;
+
+// 1. Сразу открываем порт для Render, чтобы деплой не падал по таймауту
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
 });
+
+// 2. Авторизуем Discord-бота параллельно
+client.login(BOT_TOKEN)
+    .then(() => console.log('Успешный вход в Discord API'))
+    .catch(err => console.error('Ошибка авторизации Discord бота:', err));
+
