@@ -115,7 +115,7 @@ async function checkAndNotifyTelegram(text) {
     }
 
     try {
-        const url = 'https://telegram.org' + TG_BOT_TOKEN + '/sendMessage';
+		const url = ['https:/', 'api.telegram.org', 'bot' + TG_BOT_TOKEN, 'sendMessage'].join('/');
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
