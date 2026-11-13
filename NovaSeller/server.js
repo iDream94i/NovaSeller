@@ -72,7 +72,9 @@ async function checkAndNotifyTelegram(text) {
 
     const lines = text.split('\n');
     let currentBuyer = 0;
-    const goodDeals = [];
+    
+    // Объект для хранения только САМОГО ВЫГОДНОГО предложения по каждому товару
+    const bestDealsMap = {};
 
     const timeMatch = text.match(/(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/);
     const updateTime = timeMatch ? timeMatch[1] : new Date().toLocaleTimeString('ru-RU');
@@ -98,11 +100,28 @@ async function checkAndNotifyTelegram(text) {
                     const bracketPrice = digitsMatch ? parseInt(digitsMatch[0], 10) : -1;
                     const threshold = PRICE_THRESHOLDS[itemName];
 
+                    // Проверяем, превышает ли цена ваш порог
                     if (threshold && bracketPrice > threshold) {
-                        goodDeals.push(`• <b>${itemName}</b> (${BUYER_NAMES[currentBuyer]}): ${priceValue}`);
+                        // Если этого товара еще нет в списке ИЛИ новая цена выше уже найденной — перезаписываем
+                        if (!bestDealsMap[itemName] || bracketPrice > bestDealsMap[itemName].priceNum) {
+                            bestDealsMap[itemName] = {
+                                buyer: BUYER_NAMES[currentBuyer],
+                                priceStr: priceValue,
+                                priceNum: bracketPrice
+                            };
+                        }
                     }
                 }
             }
+        }
+    });
+
+    // Формируем итоговый список, сортируя его строго по порядку ключей из PRICE_THRESHOLDS
+    const goodDeals = [];
+    Object.keys(PRICE_THRESHOLDS).forEach(itemName => {
+        if (bestDealsMap[itemName]) {
+            const deal = bestDealsMap[itemName];
+            goodDeals.push(`• <b>${itemName}</b> (${deal.buyer}): ${deal.priceStr}`);
         }
     });
 
@@ -114,27 +133,35 @@ async function checkAndNotifyTelegram(text) {
         tgMessage += `📉 В этом часе цен выше установленного порога нет.`;
     }
 
-    try {
-		const url = ['https:/', 'api.telegram.org', 'bot' + TG_BOT_TOKEN, 'sendMessage'].join('/');
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: TG_CHAT_ID,
-                text: tgMessage,
-                parse_mode: 'HTML'
-            })
-        });
-        const result = await response.json();
-        if (result.ok) {
-            console.log('Уведомление успешно отправлено в Telegram!');
-        } else {
-            console.error('Ошибка от самого Telegram API:', result.description);
+    // Безопасная отправка всем пользователям, указанным через запятую в TG_CHAT_ID
+    const chatIds = TG_CHAT_ID.split(',').map(id => id.trim()).filter(Boolean);
+    const url = ['https:/', 'api.telegram.org', 'bot' + TG_BOT_TOKEN, 'sendMessage'].join('/');
+
+    for (const chatId of chatIds) {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: tgMessage,
+                    parse_mode: 'HTML'
+                })
+            });
+            const result = await response.json();
+            if (!result.ok) {
+                console.error(`Ошибка отправки для ID ${chatId}:`, result.description);
+            }
+        } catch (err) {
+            console.error(`Сетевая ошибка для ID ${chatId}:`, err);
         }
-    } catch (err) {
-        console.error('Сетевая ошибка отправки в Telegram:', err);
+        
+        // Небольшая пауза 50 мс, чтобы не превышать лимиты Telegram при массовой отправке
+        await new Promise(resolve => setTimeout(resolve, 50));
     }
+    console.log(`Уведомление успешно отправлено (${chatIds.length} получателей).`);
 }
+
 
 client.once('ready', async () => {
     console.log(`Робот ${client.user.tag} успешно запущен в сеть!`);
